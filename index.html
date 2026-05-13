@@ -575,22 +575,18 @@
           </div>
         </div>
 
-        <!-- AI Settings -->
+        <!-- Claude Project Prompt -->
         <div class="settings-section">
-          <div class="settings-label">AI自動入力（Anthropic API）</div>
+          <div class="settings-label">Claudeプロジェクト用プロンプト</div>
           <div class="card">
             <div style="padding:14px 16px">
-              <div class="form-group">
-                <label>APIキー</label>
-                <div style="display:flex;gap:8px">
-                  <input type="password" id="api-key-input" placeholder="sk-ant-…" style="flex:1">
-                  <button class="btn btn-primary btn-sm" onclick="saveApiKey()">保存</button>
-                </div>
-              </div>
-              <p style="font-size:12px;color:var(--text-muted);line-height:1.6">
-                キーはこの端末のブラウザにのみ保存されます。<br>
-                メモ編集画面の「AIから貼り付け」ボタンで使用します。
+              <p style="font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:12px">
+                claude.ai のプロジェクトにこのプロンプトを設定しておくと、ボイスメモを貼り付けるだけで各項目に整形された出力が得られます。各ブロックをコピーしてフォームに貼り付けてください。
               </p>
+              <button class="btn btn-outline btn-full" onclick="copyPrompt()" id="copy-prompt-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                プロンプトをコピー
+              </button>
             </div>
           </div>
         </div>
@@ -823,32 +819,53 @@
   </div>
 </div>
 
-<!-- AI import modal -->
+<!-- AI usage guide modal -->
 <div class="modal-overlay" id="modal-ai">
   <div class="ai-modal-content">
     <div class="ai-modal-header">
-      <span style="font-size:20px">🤖</span>
-      <span style="font-size:16px;font-weight:800;flex:1">AIテキストから自動入力</span>
+      <span style="font-size:20px">💡</span>
+      <span style="font-size:16px;font-weight:800;flex:1">Claudeで整形する使い方</span>
       <button class="btn-icon" onclick="closeModal('modal-ai')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
     <div class="ai-modal-body">
-      <p style="font-size:14px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
-        ChatGPT・Claude等で生成した診察メモのテキストをそのまま貼り付けてください。<br>各項目を自動で読み取ってフォームに反映します。
-      </p>
-      <div class="form-group">
-        <label>テキストを貼り付け</label>
-        <textarea id="ai-paste-input" style="min-height:180px" placeholder="ここに診察メモのテキストを貼り付けてください…"></textarea>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--c1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">1</div>
+          <div>
+            <div style="font-weight:700;margin-bottom:3px">Claudeプロジェクトを準備</div>
+            <div style="font-size:13px;color:var(--text-muted);line-height:1.6">設定タブの「プロンプトをコピー」ボタンでシステムプロンプトを取得し、claude.ai のプロジェクト設定に貼り付けます。（一度だけ）</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--c2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">2</div>
+          <div>
+            <div style="font-weight:700;margin-bottom:3px">ボイスメモを貼り付けて送信</div>
+            <div style="font-size:13px;color:var(--text-muted);line-height:1.6">診察後のボイスメモや走り書きをそのままClaudeに貼り付けると、【精神状態】【症状の見立て】などのブロックに整形して出力されます。</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--c3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">3</div>
+          <div>
+            <div style="font-weight:700;margin-bottom:3px">各ブロックをフォームへコピペ</div>
+            <div style="font-size:13px;color:var(--text-muted);line-height:1.6">Claudeが出力した各ブロックを、このフォームの対応する欄にコピー&ペーストして保存します。</div>
+          </div>
+        </div>
       </div>
-      <div id="ai-status" class="ai-status"></div>
+      <div style="margin-top:16px;padding:12px;background:var(--primary-light);border-radius:var(--radius-sm);font-size:13px;color:var(--primary);line-height:1.6">
+        フィールドの対応：<br>
+        【精神状態】→ 精神状態<br>
+        【新たな困りごと】→ 新たな困りごと<br>
+        【背景・状況】→ 背景・状況<br>
+        【症状の見立て】→ 症状の見立て<br>
+        【解決策・提案】→ 解決策・提案<br>
+        【今後の課題・気づき】→ 今後の課題・気づき<br>
+        【振り返り】→ 振り返り
+      </div>
     </div>
     <div class="action-bar">
-      <button class="btn btn-secondary" onclick="closeModal('modal-ai')" style="min-width:88px">キャンセル</button>
-      <button class="btn btn-primary btn-full" id="ai-parse-btn" onclick="runAIParse()">
-        <span id="ai-btn-text">解析して入力</span>
-        <span id="ai-spinner" class="spinner" style="display:none"></span>
-      </button>
+      <button class="btn btn-primary btn-full" onclick="closeModal('modal-ai')">閉じる</button>
     </div>
   </div>
 </div>
@@ -1492,18 +1509,53 @@ function setAIStatus(type, html) {
 /* ═══════════════════════════════════════════ */
 /*  SETTINGS HELPERS                           */
 /* ═══════════════════════════════════════════ */
-function saveApiKey() {
-  const v = document.getElementById('api-key-input').value.trim();
-  if (!v) { alert('APIキーを入力してください'); return; }
-  localStorage.setItem(APIKEY, v);
-  document.getElementById('api-key-input').value = '';
-  document.getElementById('api-key-input').placeholder = '保存済み（sk-ant-…）';
-  alert('APIキーを保存しました');
+const CLAUDE_PROJECT_PROMPT = `あなたは診察メモの整理アシスタントです。
+
+ユーザーが診察に関するボイスメモ・走り書き・文章を共有したら、以下の項目に整理して出力してください。
+
+【ルール】
+・各項目は「【項目名】」で始め、内容を書いた後に空行を入れる
+・該当する内容がない項目は省略する
+・ユーザーの言葉・ニュアンスを尊重し、自然な日本語に整える
+・箇条書きや改行を活用して読みやすくする
+
+【出力する項目（この順番で）】
+
+【精神状態】
+気分の状態、改善・悪化の様子
+
+【新たな困りごと】
+最近気になる症状や困っていること
+
+【背景・状況】
+困りごとの背景にある出来事や環境
+
+【症状の見立て】
+医師からの診断・見解
+
+【解決策・提案】
+医師からの提案・アドバイス
+
+【今後の課題・気づき】
+診察を受けて気づいたこと、今後取り組むこと
+
+【振り返り】
+今回の診察全体の総括・感想`;
+
+function copyPrompt() {
+  navigator.clipboard.writeText(CLAUDE_PROJECT_PROMPT).then(() => {
+    const btn = document.getElementById('copy-prompt-btn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> コピーしました！';
+    btn.style.color = '#10B981';
+    btn.style.borderColor = '#10B981';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 2500);
+  }).catch(() => {
+    alert('コピーできませんでした。手動でテキストを選択してください。');
+  });
 }
-function loadApiKeyUI() {
-  const k = localStorage.getItem(APIKEY);
-  if (k) document.getElementById('api-key-input').placeholder = '保存済み（変更するには新しいキーを入力）';
-}
+
+function loadApiKeyUI() {}
 function confirmDeleteAll() { openModal('modal-delete-all'); }
 function deleteAllMemos() {
   storeMemos([]);
