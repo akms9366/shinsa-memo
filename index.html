@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#ffffff">
+  <title>診察メモ</title>
+  <style>
+    /* ── Variables ── */
+    :root {
+      --primary: #4A90D9;
+      --primary-light: #EBF4FF;
+      --bg: #EEF2F7;
+      --card: #fff;
+      --text: #1E293B;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+      --danger: #DC2626;
+      --danger-bg: #FEE2E2;
+      --c1: #6366F1;
+      --c2: #10B981;
+      --c3: #F59E0B;
+      --c4: #8B5CF6;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --nav-h: 60px;
+      --header-h: 54px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    /* ── App shell ── */
+    #app {
+      height: 100dvh;
+      max-width: 680px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* ── Tab system ── */
+    .tabs-wrap { flex: 1; min-height: 0; position: relative; }
+    .tab { display: none; height: 100%; flex-direction: column; }
+    .tab.active { display: flex; }
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 14px 14px 80px;
+    }
+    .tab-content::-webkit-scrollbar { display: none; }
+
+    /* ── Overlays (slide from right) ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      max-width: 680px;
+      left: 50%;
+      transform: translateX(calc(-50% + 100%));
+      width: 100%;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      z-index: 200;
+      transition: transform 0.26s cubic-bezier(0.4,0,0.2,1);
+    }
+    .overlay.visible { transform: translateX(-50%); }
+    .overlay-content {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 14px 14px 90px;
+    }
+    .overlay-content::-webkit-scrollbar { display: none; }
+
+    /* ── Headers ── */
+    .header {
+      background: var(--card);
+      height: var(--header-h);
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .header-title {
+      flex: 1;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-icon {
+      width: 40px; height: 40px;
+      border: none; background: none; cursor: pointer;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .btn-icon:active { background: var(--bg); }
+
+    /* ── Bottom Nav ── */
+    .bottom-nav {
+      height: var(--nav-h);
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      flex: 1; border: none; background: none; cursor: pointer;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px; color: var(--text-muted);
+      font-size: 10px; font-weight: 600; font-family: inherit;
+      transition: color 0.15s;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .nav-btn.active { color: var(--primary); }
+    .nav-btn svg { flex-shrink: 0; }
+
+    /* ── FAB ── */
+    .fab {
+      position: fixed;
+      bottom: calc(var(--nav-h) + 16px);
+      right: max(16px, calc(50% - 340px + 16px));
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: var(--primary); color: #fff;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 20px rgba(74,144,217,0.45);
+      z-index: 100;
+      transition: transform 0.12s;
+    }
+    .fab:active { transform: scale(0.9); }
+
+    /* ── Action bar ── */
+    .action-bar {
+      display: flex; gap: 8px;
+      padding: 10px 14px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px; padding: 0 18px; height: 46px;
+      border-radius: var(--radius-sm); border: none; cursor: pointer;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      transition: opacity .12s, transform .1s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: var(--bg); color: var(--text); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); }
+    .btn-outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+    .btn-full { flex: 1; }
+    .btn-sm { height: 36px; padding: 0 14px; font-size: 13px; }
+
+    /* ── Form elements ── */
+    label {
+      display: block;
+      font-size: 11.5px; font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="date"], input[type="password"],
+    select, textarea {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 13px;
+      font-size: 16px; font-family: inherit;
+      color: var(--text); background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(74,144,217,0.15);
+    }
+    select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; padding-right: 36px; }
+    textarea { resize: none; overflow: hidden; min-height: 80px; line-height: 1.65; }
+
+    .form-block {
+      background: #fff; border-radius: var(--radius);
+      margin-bottom: 14px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .form-block-header {
+      padding: 11px 16px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .form-block-body { padding: 14px 16px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group:last-child { margin-bottom: 0; }
+
+    /* ── Cards ── */
+    .card {
+      background: #fff; border-radius: var(--radius);
+      box-shadow: var(--shadow); overflow: hidden;
+    }
+    .card + .card { margin-top: 10px; }
+
+    /* ── Section number badge ── */
+    .sec-num {
+      width: 26px; height: 26px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0;
+    }
+    .sec-label { font-size: 14px; font-weight: 700; flex: 1; }
+
+    /* ── Memo list ── */
+    .memo-list { display: flex; flex-direction: column; gap: 10px; }
+    .memo-card {
+      background: #fff; border-radius: var(--radius);
+      padding: 14px 16px; box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: transform .12s, opacity .12s;
+      border-left: 4px solid var(--primary);
+    }
+    .memo-card:active { transform: scale(0.975); opacity: 0.82; }
+    .memo-card-date { font-size: 12px; color: var(--primary); font-weight: 700; margin-bottom: 2px; }
+    .memo-card-hosp { font-size: 11px; font-weight: 700; margin-bottom: 3px; }
+    .memo-card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; line-height: 1.4; }
+    .memo-card-preview {
+      font-size: 13px; color: var(--text-muted); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .memo-card-tags { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+    .tag { font-size: 11px; padding: 2px 9px; border-radius: 100px; font-weight: 700; }
+    .tag-1 { background: #EEF2FF; color: var(--c1); }
+    .tag-2 { background: #D1FAE5; color: #059669; }
+    .tag-3 { background: #FEF3C7; color: #D97706; }
+    .tag-r { background: #EDE9FE; color: var(--c4); }
+
+    /* ── Search bar ── */
+    .search-wrap {
+      display: flex; align-items: center; gap: 8px;
+      background: #fff; border-radius: var(--radius-sm);
+      padding: 0 12px; margin-bottom: 12px; box-shadow: var(--shadow);
+    }
+    .search-wrap input {
+      flex: 1; border: none; outline: none; box-shadow: none;
+      padding: 11px 0; font-size: 15px; background: transparent;
+    }
+
+    /* ── Calendar ── */
+    .cal-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 4px 12px;
+    }
+    .cal-nav-title { font-size: 18px; font-weight: 800; }
+    .cal-dow {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      margin-bottom: 4px;
+    }
+    .cal-dow-cell {
+      text-align: center; font-size: 11px; font-weight: 700;
+      color: var(--text-muted); padding: 4px 0;
+    }
+    .cal-dow-cell:first-child { color: #EF4444; }
+    .cal-dow-cell:last-child  { color: var(--primary); }
+
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    .cal-cell {
+      background: #fff; border-radius: 8px;
+      min-height: 52px; padding: 5px 4px 4px;
+      cursor: pointer; position: relative;
+      transition: background .12s;
+    }
+    .cal-cell:active { background: var(--primary-light); }
+    .cal-cell.empty { background: transparent; cursor: default; }
+    .cal-cell.today .cal-day-num {
+      background: var(--primary); color: #fff;
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+    }
+    .cal-cell.other-month .cal-day-num { color: var(--text-muted); opacity: 0.5; }
+    .cal-day-num { font-size: 12px; font-weight: 700; margin-bottom: 3px; line-height: 1; }
+    .cal-dots { display: flex; flex-wrap: wrap; gap: 2px; }
+    .cal-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Detail view ── */
+    .detail-date { font-size: 13px; color: var(--primary); font-weight: 700; margin-bottom: 3px; }
+    .detail-hosp-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 700;
+      padding: 3px 10px; border-radius: 100px;
+      margin-bottom: 10px;
+    }
+    .detail-title { font-size: 20px; font-weight: 800; margin-bottom: 18px; line-height: 1.35; }
+    .section-card {
+      background: #fff; border-radius: var(--radius);
+      margin-bottom: 12px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .section-header {
+      padding: 11px 14px;
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+    }
+    .chevron { transition: transform .2s; flex-shrink: 0; color: var(--text-muted); }
+    .chevron.open { transform: rotate(180deg); }
+    .section-body { padding: 0 14px 14px; }
+    .sub-block { margin-bottom: 12px; }
+    .sub-block:last-child { margin-bottom: 0; }
+    .sub-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 4px; }
+    .sub-content { font-size: 15px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+    .sub-div { height: 1px; background: var(--border); margin: 10px 0; }
+    .reflection-card {
+      background: linear-gradient(135deg,#EDE9FE,#F5F3FF);
+      border: 1px solid #C4B5FD; border-radius: var(--radius);
+      padding: 14px; margin-bottom: 12px;
+    }
+    .reflection-hd { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; color: var(--c4); margin-bottom: 8px; }
+    .reflection-bd { font-size: 15px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; color: #3B1D8C; }
+
+    /* ── Hospital list (settings) ── */
+    .hosp-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 13px 14px; cursor: pointer;
+      transition: background .12s;
+    }
+    .hosp-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+    .hosp-item:active { background: var(--bg); }
+    .hosp-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .hosp-info { flex: 1; }
+    .hosp-name { font-size: 15px; font-weight: 700; }
+    .hosp-dept { font-size: 12px; color: var(--text-muted); }
+
+    /* ── Color swatches ── */
+    .color-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+    .swatch {
+      width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+      border: 3px solid transparent;
+      transition: border-color .15s, transform .1s;
+    }
+    .swatch.selected { border-color: var(--text); transform: scale(1.12); }
+    .swatch:active { transform: scale(0.92); }
+
+    /* ── Settings sections ── */
+    .settings-section { margin-bottom: 22px; }
+    .settings-label {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--text-muted);
+      padding: 0 4px; margin-bottom: 8px;
+    }
+
+    /* ── Export ── */
+    .radio-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+    .radio-label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      text-transform: none; letter-spacing: 0; color: var(--text);
+    }
+    .radio-label input[type="radio"] { width: 18px; height: 18px; accent-color: var(--primary); }
+    .date-range-row { display: flex; align-items: center; gap: 8px; }
+    .date-range-row input { flex: 1; }
+    .date-range-sep { color: var(--text-muted); font-size: 14px; flex-shrink: 0; }
+
+    /* ── AI import modal ── */
+    .ai-modal-content {
+      background: #fff;
+      border-radius: var(--radius) var(--radius) 0 0;
+      max-width: 680px; width: 100%;
+      max-height: 90vh;
+      display: flex; flex-direction: column;
+      animation: slideUp .22s cubic-bezier(0.4,0,0.2,1);
+    }
+    .ai-modal-header {
+      padding: 16px 16px 10px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ai-modal-body { padding: 14px 16px; flex: 1; overflow-y: auto; }
+    .ai-status {
+      font-size: 14px; padding: 10px 14px; border-radius: var(--radius-sm);
+      margin-top: 10px; display: none;
+    }
+    .ai-status.info { background: var(--primary-light); color: var(--primary); display: block; }
+    .ai-status.error { background: var(--danger-bg); color: var(--danger); display: block; }
+    .ai-status.success { background: #D1FAE5; color: #059669; display: block; }
+
+    /* ── Modals ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.46); z-index: 500;
+      align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 22px 16px 32px;
+      width: 100%; max-width: 680px;
+      animation: slideUp .22s cubic-bezier(0.4,0,0.2,1);
+    }
+    .modal-title { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+    .modal-text { font-size: 14px; color: var(--text-muted); margin-bottom: 18px; }
+    .modal-btns { display: flex; flex-direction: column; gap: 8px; }
+
+    /* ── Day detail sheet ── */
+    .day-memo-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 0; cursor: pointer;
+    }
+    .day-memo-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+    .day-memo-item:active { opacity: 0.7; }
+
+    /* ── Empty state ── */
+    .empty-state { text-align: center; padding: 56px 24px 32px; }
+    .empty-icon { font-size: 56px; margin-bottom: 14px; }
+    .empty-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .empty-text { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+
+    /* ── Animations ── */
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-in { animation: fadeUp .18s ease-out; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2.5px solid rgba(74,144,217,0.3);
+      border-top-color: var(--primary);
+      animation: spin .7s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Misc ── */
+    .divider { height: 1px; background: var(--border); margin: 2px 0; }
+    .list-meta-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .count-text { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+
+    /* ── Desktop ── */
+    @media (min-width: 680px) {
+      .fab { bottom: calc(var(--nav-h) + 24px); right: calc(50% - 340px + 16px); }
+      .overlay { left: 50%; transform: translateX(calc(-50% + 100%)); }
+      .overlay.visible { transform: translateX(-50%); }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  TAB CONTAINER                        -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="tabs-wrap">
+
+    <!-- ── LIST TAB ── -->
+    <div class="tab active" id="tab-list">
+      <div class="header">
+        <span class="header-title">診察メモ</span>
+      </div>
+      <div class="tab-content">
+        <div class="search-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input id="search-input" type="search" placeholder="キーワードで検索…" oninput="onSearch()" autocomplete="off">
+        </div>
+        <div id="list-meta" class="list-meta-row" style="display:none">
+          <span id="list-count" class="count-text"></span>
+          <button class="btn btn-secondary btn-sm" onclick="clearSearch()">クリア</button>
+        </div>
+        <div id="memo-list" class="memo-list"></div>
+      </div>
+      <button class="fab" onclick="openEdit(null)" title="新規メモ">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+
+    <!-- ── CALENDAR TAB ── -->
+    <div class="tab" id="tab-calendar">
+      <div class="header">
+        <span class="header-title">カレンダー</span>
+      </div>
+      <div class="tab-content">
+        <div class="card" style="padding:14px">
+          <div class="cal-nav">
+            <button class="btn-icon" onclick="calMove(-1)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <span class="cal-nav-title" id="cal-title"></span>
+            <button class="btn-icon" onclick="calMove(1)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+          <div class="cal-dow">
+            <div class="cal-dow-cell">日</div><div class="cal-dow-cell">月</div>
+            <div class="cal-dow-cell">火</div><div class="cal-dow-cell">水</div>
+            <div class="cal-dow-cell">木</div><div class="cal-dow-cell">金</div>
+            <div class="cal-dow-cell">土</div>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+        <div id="cal-list" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS TAB ── -->
+    <div class="tab" id="tab-settings">
+      <div class="header">
+        <span class="header-title">設定</span>
+      </div>
+      <div class="tab-content">
+
+        <!-- Hospital management -->
+        <div class="settings-section">
+          <div class="settings-label">病院を管理</div>
+          <div class="card" id="hosp-list-wrap">
+            <div id="hosp-list"></div>
+            <div style="padding:12px 14px">
+              <button class="btn btn-outline btn-full" onclick="openHospital(null)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                病院を追加
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CSV Export -->
+        <div class="settings-section">
+          <div class="settings-label">データをエクスポート</div>
+          <div class="card">
+            <div style="padding:14px 16px">
+              <div class="radio-row">
+                <label class="radio-label">
+                  <input type="radio" name="export-range" value="all" checked onchange="toggleDateRange()"> 全期間
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="export-range" value="range" onchange="toggleDateRange()"> 期間を指定
+                </label>
+              </div>
+              <div id="date-range-wrap" style="display:none; margin-bottom:12px">
+                <div class="date-range-row">
+                  <input type="date" id="export-from">
+                  <span class="date-range-sep">〜</span>
+                  <input type="date" id="export-to">
+                </div>
+              </div>
+              <button class="btn btn-primary btn-full" onclick="doExportCSV()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                CSVをダウンロード
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Settings -->
+        <div class="settings-section">
+          <div class="settings-label">AI自動入力（Anthropic API）</div>
+          <div class="card">
+            <div style="padding:14px 16px">
+              <div class="form-group">
+                <label>APIキー</label>
+                <div style="display:flex;gap:8px">
+                  <input type="password" id="api-key-input" placeholder="sk-ant-…" style="flex:1">
+                  <button class="btn btn-primary btn-sm" onclick="saveApiKey()">保存</button>
+                </div>
+              </div>
+              <p style="font-size:12px;color:var(--text-muted);line-height:1.6">
+                キーはこの端末のブラウザにのみ保存されます。<br>
+                メモ編集画面の「AIから貼り付け」ボタンで使用します。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="settings-section">
+          <div class="settings-label">データ管理</div>
+          <div class="card">
+            <div style="padding:14px 16px">
+              <button class="btn btn-danger btn-full" onclick="confirmDeleteAll()">すべてのメモを削除</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div><!-- /tabs-wrap -->
+
+  <!-- ── BOTTOM NAV ── -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-list" onclick="showTab('list')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>一覧</span>
+    </button>
+    <button class="nav-btn" id="nav-calendar" onclick="showTab('calendar')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>カレンダー</span>
+    </button>
+    <button class="nav-btn" id="nav-settings" onclick="showTab('settings')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>設定</span>
+    </button>
+  </nav>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  OVERLAYS                             -->
+  <!-- ══════════════════════════════════════ -->
+
+  <!-- ── DETAIL OVERLAY ── -->
+  <div class="overlay" id="overlay-detail">
+    <div class="header">
+      <button class="btn-icon" onclick="closeOverlay('detail')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="header-title" id="detail-head-title">詳細</span>
+      <button class="btn-icon" onclick="openDeleteModal()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+      </button>
+    </div>
+    <div class="overlay-content animate-in" id="detail-content"></div>
+    <div class="action-bar">
+      <button class="btn btn-primary btn-full" onclick="openEdit(currentId)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        編集する
+      </button>
+    </div>
+  </div>
+
+  <!-- ── EDIT OVERLAY ── -->
+  <div class="overlay" id="overlay-edit">
+    <div class="header">
+      <button class="btn-icon" onclick="onCancelEdit()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="header-title" id="edit-head-title">新規メモ</span>
+      <button class="btn-icon" onclick="openAIModal()" title="AIから自動入力">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </button>
+    </div>
+    <div class="overlay-content">
+      <!-- Basic info -->
+      <div class="form-block">
+        <div class="form-block-body">
+          <div class="form-group">
+            <label>診察日</label>
+            <input type="date" id="f-date">
+          </div>
+          <div class="form-group">
+            <label>タイトル（省略可）</label>
+            <input type="text" id="f-title" placeholder="例：5月の診察まとめ" maxlength="60">
+          </div>
+          <div class="form-group">
+            <label>病院</label>
+            <select id="f-hospital">
+              <option value="">選択しない</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <!-- Section 1 -->
+      <div class="form-block">
+        <div class="form-block-header">
+          <div class="sec-num" style="background:var(--c1)">1</div>
+          <span class="sec-label" style="color:var(--c1)">自分の状態と主観</span>
+        </div>
+        <div class="form-block-body">
+          <div class="form-group"><label>精神状態</label><textarea id="f-mental" placeholder="気分の状態、改善・悪化の様子など"></textarea></div>
+          <div class="form-group"><label>新たな困りごと</label><textarea id="f-concerns" placeholder="最近気になる症状や困っていること"></textarea></div>
+          <div class="form-group"><label>背景・状況</label><textarea id="f-bg" placeholder="困りごとの背景にある出来事や環境など"></textarea></div>
+        </div>
+      </div>
+      <!-- Section 2 -->
+      <div class="form-block">
+        <div class="form-block-header">
+          <div class="sec-num" style="background:var(--c2)">2</div>
+          <span class="sec-label" style="color:var(--c2)">医師とのやり取り</span>
+        </div>
+        <div class="form-block-body">
+          <div class="form-group"><label>症状の見立て</label><textarea id="f-assessment" placeholder="医師からの診断・見解"></textarea></div>
+          <div class="form-group"><label>解決策・提案</label><textarea id="f-proposals" placeholder="医師からの提案、アドバイスなど"></textarea></div>
+        </div>
+      </div>
+      <!-- Section 3 -->
+      <div class="form-block">
+        <div class="form-block-header">
+          <div class="sec-num" style="background:var(--c3)">3</div>
+          <span class="sec-label" style="color:var(--c3)">今後の課題・気づき</span>
+        </div>
+        <div class="form-block-body">
+          <div class="form-group"><textarea id="f-tasks" placeholder="診察を受けて気づいたこと、今後取り組むことなど"></textarea></div>
+        </div>
+      </div>
+      <!-- Reflection -->
+      <div class="form-block">
+        <div class="form-block-header" style="background:linear-gradient(135deg,#EDE9FE,#F5F3FF)">
+          <span style="font-size:18px">💭</span>
+          <span class="sec-label" style="color:var(--c4)">振り返り</span>
+        </div>
+        <div class="form-block-body">
+          <div class="form-group"><textarea id="f-reflection" placeholder="今回の診察全体を振り返って…"></textarea></div>
+        </div>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" onclick="onCancelEdit()" style="min-width:88px">キャンセル</button>
+      <button class="btn btn-primary btn-full" onclick="saveMemo()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v14z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        保存する
+      </button>
+    </div>
+  </div>
+
+  <!-- ── HOSPITAL EDIT OVERLAY ── -->
+  <div class="overlay" id="overlay-hospital">
+    <div class="header">
+      <button class="btn-icon" onclick="closeOverlay('hospital'); renderHospList();">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="header-title" id="hosp-head-title">病院を追加</span>
+      <button class="btn-icon" id="hosp-delete-btn" onclick="confirmDeleteHosp()" style="display:none">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+      </button>
+    </div>
+    <div class="overlay-content">
+      <div class="form-block">
+        <div class="form-block-body">
+          <div class="form-group">
+            <label>病院名</label>
+            <input type="text" id="h-name" placeholder="例：〇〇クリニック" maxlength="40">
+          </div>
+          <div class="form-group">
+            <label>診療科</label>
+            <select id="h-dept"></select>
+          </div>
+          <div class="form-group">
+            <label>カラー</label>
+            <div class="color-swatches" id="h-color-swatches"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-primary btn-full" onclick="saveHospital()">保存する</button>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ══════════════════════════════════════ -->
+<!--  MODALS                               -->
+<!-- ══════════════════════════════════════ -->
+
+<!-- Delete memo modal -->
+<div class="modal-overlay" id="modal-delete">
+  <div class="modal">
+    <div class="modal-title">このメモを削除しますか？</div>
+    <div class="modal-text">削除したメモは元に戻せません。</div>
+    <div class="modal-btns">
+      <button class="btn btn-danger" style="height:50px;font-size:16px" onclick="deleteMemo()">削除する</button>
+      <button class="btn btn-secondary" style="height:50px;font-size:16px" onclick="closeModal('modal-delete')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete hospital modal -->
+<div class="modal-overlay" id="modal-delete-hosp">
+  <div class="modal">
+    <div class="modal-title">この病院を削除しますか？</div>
+    <div class="modal-text">関連するメモの病院タグは削除されます。</div>
+    <div class="modal-btns">
+      <button class="btn btn-danger" style="height:50px;font-size:16px" onclick="deleteHospital()">削除する</button>
+      <button class="btn btn-secondary" style="height:50px;font-size:16px" onclick="closeModal('modal-delete-hosp')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete all modal -->
+<div class="modal-overlay" id="modal-delete-all">
+  <div class="modal">
+    <div class="modal-title">すべてのメモを削除しますか？</div>
+    <div class="modal-text">この操作は元に戻せません。すべての診察メモが削除されます。</div>
+    <div class="modal-btns">
+      <button class="btn btn-danger" style="height:50px;font-size:16px" onclick="deleteAllMemos()">すべて削除する</button>
+      <button class="btn btn-secondary" style="height:50px;font-size:16px" onclick="closeModal('modal-delete-all')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar day sheet -->
+<div class="modal-overlay" id="modal-day">
+  <div class="modal">
+    <div class="modal-title" id="modal-day-title"></div>
+    <div id="modal-day-list"></div>
+    <div style="margin-top:12px">
+      <button class="btn btn-outline btn-full" id="modal-day-new-btn" onclick="newMemoForDate()">この日のメモを追加</button>
+    </div>
+    <div style="margin-top:8px">
+      <button class="btn btn-secondary btn-full" onclick="closeModal('modal-day')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI import modal -->
+<div class="modal-overlay" id="modal-ai">
+  <div class="ai-modal-content">
+    <div class="ai-modal-header">
+      <span style="font-size:20px">🤖</span>
+      <span style="font-size:16px;font-weight:800;flex:1">AIテキストから自動入力</span>
+      <button class="btn-icon" onclick="closeModal('modal-ai')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="ai-modal-body">
+      <p style="font-size:14px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
+        ChatGPT・Claude等で生成した診察メモのテキストをそのまま貼り付けてください。<br>各項目を自動で読み取ってフォームに反映します。
+      </p>
+      <div class="form-group">
+        <label>テキストを貼り付け</label>
+        <textarea id="ai-paste-input" style="min-height:180px" placeholder="ここに診察メモのテキストを貼り付けてください…"></textarea>
+      </div>
+      <div id="ai-status" class="ai-status"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ai')" style="min-width:88px">キャンセル</button>
+      <button class="btn btn-primary btn-full" id="ai-parse-btn" onclick="runAIParse()">
+        <span id="ai-btn-text">解析して入力</span>
+        <span id="ai-spinner" class="spinner" style="display:none"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ -->
+<!--  JAVASCRIPT                           -->
+<!-- ══════════════════════════════════════ -->
+<script>
+/* ── Constants ── */
+const MEMO_KEY  = 'shinsa-memos-v2';
+const HOSP_KEY  = 'shinsa-hospitals-v1';
+const APIKEY    = 'shinsa-api-key';
+
+const DEPARTMENTS = [
+  '心療内科','精神科','内科','外科','整形外科',
+  '皮膚科','眼科','耳鼻咽喉科','泌尿器科','婦人科',
+  '産科','小児科','歯科','口腔外科','その他'
+];
+
+const SWATCH_COLORS = [
+  '#4A90D9','#E84393','#10B981','#F59E0B',
+  '#8B5CF6','#EF4444','#06B6D4','#F97316',
+  '#84CC16','#EC4899'
+];
+
+/* ── Data helpers ── */
+const loadMemos   = () => { try { return JSON.parse(localStorage.getItem(MEMO_KEY) || '[]'); } catch { return []; } };
+const storeMemos  = d  => localStorage.setItem(MEMO_KEY, JSON.stringify(d));
+const loadHosps   = () => { try { return JSON.parse(localStorage.getItem(HOSP_KEY) || '[]'); } catch { return []; } };
+const storeHosps  = d  => localStorage.setItem(HOSP_KEY, JSON.stringify(d));
+const uid         = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const hospMap     = () => Object.fromEntries(loadHosps().map(h => [h.id, h]));
+
+/* ── State ── */
+let currentId      = null;
+let currentHospId  = null;
+let isDirty        = false;
+let calYear        = new Date().getFullYear();
+let calMonth       = new Date().getMonth();
+let selectedColor  = SWATCH_COLORS[0];
+let calSelectedDate = null;
+
+/* ── Tab navigation ── */
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'list')     renderList();
+  if (name === 'calendar') renderCalendar();
+  if (name === 'settings') { renderHospList(); loadApiKeyUI(); }
+}
+
+/* ── Overlay management ── */
+function openOverlay(name) {
+  document.getElementById('overlay-' + name).classList.add('visible');
+}
+function closeOverlay(name) {
+  document.getElementById('overlay-' + name).classList.remove('visible');
+}
+
+/* ── Modal management ── */
+function openModal(id) {
+  document.getElementById(id).classList.add('active');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('active'); });
+});
+
+/* ═══════════════════════════════════════════ */
+/*  LIST VIEW                                  */
+/* ═══════════════════════════════════════════ */
+function renderList(subset) {
+  const all    = loadMemos().sort((a,b) => b.date.localeCompare(a.date));
+  const memos  = subset !== undefined ? subset : all;
+  const hmap   = hospMap();
+  const el     = document.getElementById('memo-list');
+
+  if (!memos.length) {
+    const q = document.getElementById('search-input').value.trim();
+    el.innerHTML = q
+      ? `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">見つかりませんでした</div><div class="empty-text">「${esc(q)}」に一致するメモがありません。</div></div>`
+      : `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">メモがありません</div><div class="empty-text">右下の ＋ ボタンから<br>最初の診察メモを作りましょう</div></div>`;
+    return;
+  }
+
+  el.innerHTML = memos.map(m => {
+    const h    = hmap[m.hospitalId];
+    const tags = [];
+    if (m.mental||m.concerns||m.bg) tags.push('<span class="tag tag-1">状態</span>');
+    if (m.assessment||m.proposals)  tags.push('<span class="tag tag-2">医師</span>');
+    if (m.tasks)                     tags.push('<span class="tag tag-3">課題</span>');
+    if (m.reflection)                tags.push('<span class="tag tag-r">振り返り</span>');
+    const preview = m.mental||m.concerns||m.assessment||m.tasks||m.reflection||'';
+    const borderColor = h ? h.color : 'var(--primary)';
+    return `
+      <div class="memo-card animate-in" style="border-left-color:${borderColor}" onclick="openDetail('${m.id}')">
+        <div class="memo-card-date">${fmtDate(m.date)}</div>
+        ${h ? `<div class="memo-card-hosp" style="color:${h.color}">● ${esc(h.name)}（${esc(h.dept)}）</div>` : ''}
+        <div class="memo-card-title">${esc(m.title||'診察記録まとめ')}</div>
+        ${preview ? `<div class="memo-card-preview">${esc(preview)}</div>` : ''}
+        ${tags.length ? `<div class="memo-card-tags">${tags.join('')}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function onSearch() {
+  const q    = document.getElementById('search-input').value.trim();
+  const meta = document.getElementById('list-meta');
+  if (!q) { meta.style.display = 'none'; renderList(); return; }
+  const res = loadMemos()
+    .sort((a,b) => b.date.localeCompare(a.date))
+    .filter(m => [m.title,m.mental,m.concerns,m.bg,m.assessment,m.proposals,m.tasks,m.reflection].join(' ').toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('list-count').textContent = `「${q}」 ${res.length}件`;
+  meta.style.display = 'flex';
+  renderList(res);
+}
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('list-meta').style.display = 'none';
+  renderList();
+}
+
+/* ═══════════════════════════════════════════ */
+/*  CALENDAR VIEW                              */
+/* ═══════════════════════════════════════════ */
+function renderCalendar() {
+  const today  = new Date();
+  const firstD = new Date(calYear, calMonth, 1);
+  const lastD  = new Date(calYear, calMonth + 1, 0);
+  const memos  = loadMemos();
+  const hmap   = hospMap();
+
+  // Group by date string
+  const byDate = {};
+  memos.forEach(m => {
+    if (!byDate[m.date]) byDate[m.date] = [];
+    byDate[m.date].push(m);
+  });
+
+  document.getElementById('cal-title').textContent = `${calYear}年${calMonth+1}月`;
+
+  const startDow = firstD.getDay(); // 0=Sun
+  const cells = [];
+
+  // Blank cells before month start
+  for (let i = 0; i < startDow; i++) cells.push(null);
+
+  for (let d = 1; d <= lastD.getDate(); d++) {
+    cells.push(new Date(calYear, calMonth, d));
+  }
+
+  const todayStr = toDateStr(today);
+
+  document.getElementById('cal-grid').innerHTML = cells.map(d => {
+    if (!d) return '<div class="cal-cell empty"></div>';
+    const ds      = toDateStr(d);
+    const dayMemos = byDate[ds] || [];
+    const isToday = ds === todayStr;
+    const cls     = `cal-cell${isToday ? ' today' : ''}`;
+    const dots    = dayMemos.map(m => {
+      const h   = hmap[m.hospitalId];
+      const col = h ? h.color : 'var(--primary)';
+      return `<div class="cal-dot" style="background:${col}"></div>`;
+    }).join('');
+    return `
+      <div class="${cls}" onclick="calDayTap('${ds}')">
+        <div class="cal-day-num">${isToday ? `<span>${d.getDate()}</span>` : d.getDate()}</div>
+        ${dots ? `<div class="cal-dots">${dots}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  // Show this month's memos list below calendar
+  const thisMonth = memos
+    .filter(m => m.date.startsWith(`${calYear}-${String(calMonth+1).padStart(2,'0')}`))
+    .sort((a,b) => b.date.localeCompare(a.date));
+
+  const calList = document.getElementById('cal-list');
+  if (!thisMonth.length) {
+    calList.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">この月のメモはありません</div>`;
+    return;
+  }
+  calList.innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;padding:0 4px">この月のメモ（${thisMonth.length}件）</div>
+    <div class="memo-list">
+      ${thisMonth.map(m => {
+        const h = hmap[m.hospitalId];
+        const borderColor = h ? h.color : 'var(--primary)';
+        return `
+          <div class="memo-card animate-in" style="border-left-color:${borderColor}" onclick="openDetail('${m.id}')">
+            <div class="memo-card-date">${fmtDate(m.date)}</div>
+            ${h ? `<div class="memo-card-hosp" style="color:${h.color}">● ${esc(h.name)}</div>` : ''}
+            <div class="memo-card-title">${esc(m.title||'診察記録まとめ')}</div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function calMove(delta) {
+  calMonth += delta;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function calDayTap(ds) {
+  calSelectedDate = ds;
+  const memos = loadMemos().filter(m => m.date === ds);
+  const hmap  = hospMap();
+  const d     = new Date(ds + 'T00:00:00');
+  document.getElementById('modal-day-title').textContent =
+    `${d.getMonth()+1}月${d.getDate()}日`;
+
+  const list = document.getElementById('modal-day-list');
+  if (!memos.length) {
+    list.innerHTML = `<div style="padding:10px 0;color:var(--text-muted);font-size:14px">この日のメモはありません</div>`;
+  } else {
+    list.innerHTML = memos.map(m => {
+      const h = hmap[m.hospitalId];
+      const col = h ? h.color : 'var(--primary)';
+      return `
+        <div class="day-memo-item" onclick="closeModal('modal-day');openDetail('${m.id}')">
+          <div style="width:12px;height:12px;border-radius:50%;background:${col};flex-shrink:0"></div>
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:700">${esc(m.title||'診察記録まとめ')}</div>
+            ${h ? `<div style="font-size:12px;color:${col};font-weight:700">${esc(h.name)}</div>` : ''}
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>`;
+    }).join('');
+  }
+  openModal('modal-day');
+}
+
+function newMemoForDate() {
+  closeModal('modal-day');
+  openEdit(null, calSelectedDate);
+}
+
+/* ═══════════════════════════════════════════ */
+/*  DETAIL VIEW                                */
+/* ═══════════════════════════════════════════ */
+function openDetail(id) {
+  currentId = id;
+  const m    = loadMemos().find(x => x.id === id);
+  if (!m) return;
+  const hmap = hospMap();
+  const h    = hmap[m.hospitalId];
+
+  document.getElementById('detail-head-title').textContent = m.title || '診察メモ';
+
+  const s1 = buildSubs([
+    { label:'精神状態',       val:m.mental },
+    { label:'新たな困りごと', val:m.concerns },
+    { label:'背景・状況',     val:m.bg },
+  ]);
+  const s2 = buildSubs([
+    { label:'症状の見立て', val:m.assessment },
+    { label:'解決策・提案', val:m.proposals },
+  ]);
+
+  const secs = [];
+  if (s1) secs.push({ n:1, title:'自分の状態と主観', c:'var(--c1)', html:s1 });
+  if (s2) secs.push({ n:2, title:'医師とのやり取り',  c:'var(--c2)', html:s2 });
+  if (m.tasks) secs.push({ n:3, title:'今後の課題・気づき', c:'var(--c3)',
+    html:`<div class="sub-block"><div class="sub-content">${esc(m.tasks)}</div></div>` });
+
+  const secHtml = secs.map(s => `
+    <div class="section-card">
+      <div class="section-header" onclick="toggleSection(this)">
+        <div class="sec-num" style="background:${s.c}">${s.n}</div>
+        <span class="sec-label" style="color:${s.c}">${s.title}</span>
+        <svg class="chevron open" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+      </div>
+      <div class="section-body">${s.html}</div>
+    </div>`).join('');
+
+  const refHtml = m.reflection ? `
+    <div class="reflection-card">
+      <div class="reflection-hd"><span>💭</span> 振り返り</div>
+      <div class="reflection-bd">${esc(m.reflection)}</div>
+    </div>` : '';
+
+  const hospBadge = h ? `
+    <div class="detail-hosp-badge" style="background:${h.color}22;color:${h.color}">
+      <span style="width:8px;height:8px;border-radius:50%;background:${h.color};display:inline-block"></span>
+      ${esc(h.name)}（${esc(h.dept)}）
+    </div>` : '';
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-date">${fmtDate(m.date)}</div>
+    ${hospBadge}
+    <div class="detail-title">${esc(m.title||'診察記録まとめ')}</div>
+    ${secHtml}
+    ${refHtml}`;
+
+  openOverlay('detail');
+}
+
+function buildSubs(fields) {
+  const filled = fields.filter(f => f.val && f.val.trim());
+  if (!filled.length) return '';
+  return filled.map((f,i) => `
+    ${i > 0 ? '<div class="sub-div"></div>' : ''}
+    <div class="sub-block">
+      <div class="sub-label">${f.label}</div>
+      <div class="sub-content">${esc(f.val)}</div>
+    </div>`).join('');
+}
+
+function toggleSection(header) {
+  const body = header.nextElementSibling;
+  const chev = header.querySelector('.chevron');
+  if (body.style.display === 'none') { body.style.display = ''; chev.classList.add('open'); }
+  else { body.style.display = 'none'; chev.classList.remove('open'); }
+}
+
+function openDeleteModal() { openModal('modal-delete'); }
+function deleteMemo() {
+  storeMemos(loadMemos().filter(m => m.id !== currentId));
+  closeModal('modal-delete');
+  closeOverlay('detail');
+  currentId = null;
+  renderList();
+  renderCalendar();
+}
+
+/* ═══════════════════════════════════════════ */
+/*  EDIT VIEW                                  */
+/* ═══════════════════════════════════════════ */
+function openEdit(id, prefillDate) {
+  currentId = id;
+  isDirty   = false;
+  fillEditForm(id, prefillDate);
+  fillHospSelect();
+  document.getElementById('edit-head-title').textContent = id ? '編集' : '新規メモ';
+  openOverlay('edit');
+  setTimeout(() => {
+    document.querySelectorAll('#overlay-edit textarea, #overlay-edit input').forEach(el => {
+      el.addEventListener('input', () => { isDirty = true; }, { once: true });
+    });
+    autoResizeAll();
+  }, 60);
+}
+
+function fillEditForm(id, prefillDate) {
+  const today = prefillDate || toDateStr(new Date());
+  if (!id) {
+    setVal('f-date', today); setVal('f-title',''); setVal('f-mental','');
+    setVal('f-concerns',''); setVal('f-bg',''); setVal('f-assessment','');
+    setVal('f-proposals',''); setVal('f-tasks',''); setVal('f-reflection','');
+    document.getElementById('f-hospital').value = '';
+  } else {
+    const m = loadMemos().find(x => x.id === id);
+    if (!m) return;
+    setVal('f-date',       m.date || today);
+    setVal('f-title',      m.title || '');
+    setVal('f-mental',     m.mental || '');
+    setVal('f-concerns',   m.concerns || '');
+    setVal('f-bg',         m.bg || '');
+    setVal('f-assessment', m.assessment || '');
+    setVal('f-proposals',  m.proposals || '');
+    setVal('f-tasks',      m.tasks || '');
+    setVal('f-reflection', m.reflection || '');
+    document.getElementById('f-hospital').value = m.hospitalId || '';
+  }
+}
+
+function fillHospSelect() {
+  const hosps  = loadHosps();
+  const select = document.getElementById('f-hospital');
+  const cur    = select.value;
+  select.innerHTML = '<option value="">選択しない</option>' +
+    hosps.map(h => `<option value="${h.id}">${esc(h.name)}（${esc(h.dept)}）</option>`).join('');
+  select.value = cur;
+}
+
+function saveMemo() {
+  const date = document.getElementById('f-date').value;
+  if (!date) { alert('診察日を入力してください'); return; }
+  const memos = loadMemos();
+  const now   = new Date().toISOString();
+  const data  = {
+    date, hospitalId: document.getElementById('f-hospital').value || null,
+    title:      getVal('f-title'),
+    mental:     getVal('f-mental'),
+    concerns:   getVal('f-concerns'),
+    bg:         getVal('f-bg'),
+    assessment: getVal('f-assessment'),
+    proposals:  getVal('f-proposals'),
+    tasks:      getVal('f-tasks'),
+    reflection: getVal('f-reflection'),
+    updatedAt:  now,
+  };
+  if (currentId) {
+    const i = memos.findIndex(m => m.id === currentId);
+    if (i >= 0) memos[i] = { ...memos[i], ...data };
+  } else {
+    const n = { id: uid(), createdAt: now, ...data };
+    currentId = n.id;
+    memos.push(n);
+  }
+  storeMemos(memos);
+  isDirty = false;
+  closeOverlay('edit');
+  renderList();
+  renderCalendar();
+  openDetail(currentId);
+}
+
+function onCancelEdit() {
+  if (isDirty && !confirm('変更を破棄してもよいですか？')) return;
+  closeOverlay('edit');
+}
+
+/* ═══════════════════════════════════════════ */
+/*  HOSPITAL MANAGEMENT                        */
+/* ═══════════════════════════════════════════ */
+function renderHospList() {
+  const hosps = loadHosps();
+  const wrap  = document.getElementById('hosp-list');
+  if (!hosps.length) {
+    wrap.innerHTML = `<div style="padding:14px 16px;font-size:14px;color:var(--text-muted)">登録された病院はありません</div>`;
+    return;
+  }
+  wrap.innerHTML = hosps.map(h => `
+    <div class="hosp-item" onclick="openHospital('${h.id}')">
+      <div class="hosp-color-dot" style="background:${h.color}"></div>
+      <div class="hosp-info">
+        <div class="hosp-name">${esc(h.name)}</div>
+        <div class="hosp-dept">${esc(h.dept)}</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </div>`).join('');
+}
+
+function openHospital(id) {
+  currentHospId  = id;
+  selectedColor  = SWATCH_COLORS[0];
+  const deptSel  = document.getElementById('h-dept');
+  deptSel.innerHTML = DEPARTMENTS.map(d => `<option value="${d}">${d}</option>`).join('');
+  buildSwatches();
+
+  if (id) {
+    const h = loadHosps().find(x => x.id === id);
+    if (!h) return;
+    setVal('h-name', h.name);
+    deptSel.value = h.dept;
+    selectedColor = h.color;
+    document.getElementById('hosp-head-title').textContent = '病院を編集';
+    document.getElementById('hosp-delete-btn').style.display = '';
+  } else {
+    setVal('h-name', '');
+    deptSel.value = DEPARTMENTS[0];
+    document.getElementById('hosp-head-title').textContent = '病院を追加';
+    document.getElementById('hosp-delete-btn').style.display = 'none';
+  }
+  buildSwatches();
+  openOverlay('hospital');
+}
+
+function buildSwatches() {
+  document.getElementById('h-color-swatches').innerHTML = SWATCH_COLORS.map(c => `
+    <div class="swatch${c === selectedColor ? ' selected' : ''}"
+         style="background:${c}" onclick="pickColor('${c}')"></div>`).join('');
+}
+
+function pickColor(c) {
+  selectedColor = c;
+  buildSwatches();
+}
+
+function saveHospital() {
+  const name = getVal('h-name');
+  if (!name) { alert('病院名を入力してください'); return; }
+  const hosps = loadHosps();
+  const data  = { name, dept: document.getElementById('h-dept').value, color: selectedColor };
+  if (currentHospId) {
+    const i = hosps.findIndex(h => h.id === currentHospId);
+    if (i >= 0) hosps[i] = { ...hosps[i], ...data };
+  } else {
+    hosps.push({ id: uid(), ...data });
+  }
+  storeHosps(hosps);
+  closeOverlay('hospital');
+  renderHospList();
+}
+
+function confirmDeleteHosp() { openModal('modal-delete-hosp'); }
+function deleteHospital() {
+  storeHosps(loadHosps().filter(h => h.id !== currentHospId));
+  // Remove hospital ref from memos
+  const memos = loadMemos().map(m => m.hospitalId === currentHospId ? { ...m, hospitalId: null } : m);
+  storeMemos(memos);
+  closeModal('modal-delete-hosp');
+  closeOverlay('hospital');
+  renderHospList();
+}
+
+/* ═══════════════════════════════════════════ */
+/*  CSV EXPORT                                 */
+/* ═══════════════════════════════════════════ */
+function toggleDateRange() {
+  const isRange = document.querySelector('input[name="export-range"]:checked').value === 'range';
+  document.getElementById('date-range-wrap').style.display = isRange ? 'block' : 'none';
+}
+
+function doExportCSV() {
+  let memos = loadMemos().sort((a,b) => a.date.localeCompare(b.date));
+  const hmap = hospMap();
+  const isRange = document.querySelector('input[name="export-range"]:checked').value === 'range';
+
+  if (isRange) {
+    const from = document.getElementById('export-from').value;
+    const to   = document.getElementById('export-to').value;
+    if (!from || !to) { alert('開始日と終了日を入力してください'); return; }
+    memos = memos.filter(m => m.date >= from && m.date <= to);
+  }
+
+  if (!memos.length) { alert('対象のメモがありません'); return; }
+
+  const headers = ['診察日','タイトル','病院名','診療科','精神状態','新たな困りごと','背景・状況','症状の見立て','解決策・提案','今後の課題・気づき','振り返り','作成日時','更新日時'];
+  const rows = memos.map(m => {
+    const h = hmap[m.hospitalId] || {};
+    return [
+      m.date, m.title||'', h.name||'', h.dept||'',
+      m.mental||'', m.concerns||'', m.bg||'',
+      m.assessment||'', m.proposals||'', m.tasks||'', m.reflection||'',
+      m.createdAt||'', m.updatedAt||''
+    ].map(csvCell);
+  });
+
+  const csv  = '﻿' + [headers.map(csvCell), ...rows].map(r => r.join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `shinsa-memo-${toDateStr(new Date())}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(v) {
+  const s = String(v).replace(/"/g, '""');
+  return /[,"\r\n]/.test(s) ? `"${s}"` : s;
+}
+
+/* ═══════════════════════════════════════════ */
+/*  AI PARSE                                   */
+/* ═══════════════════════════════════════════ */
+function openAIModal() {
+  document.getElementById('ai-paste-input').value = '';
+  document.getElementById('ai-status').className = 'ai-status';
+  document.getElementById('ai-status').textContent = '';
+  openModal('modal-ai');
+}
+
+async function runAIParse() {
+  const text = document.getElementById('ai-paste-input').value.trim();
+  if (!text) { alert('テキストを貼り付けてください'); return; }
+
+  const apiKey = localStorage.getItem(APIKEY);
+  if (!apiKey) {
+    setAIStatus('error', '設定タブでAnthropicのAPIキーを登録してください');
+    return;
+  }
+
+  setAIStatus('info', '解析中… <span class="spinner"></span>');
+  document.getElementById('ai-parse-btn').disabled = true;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2048,
+        messages: [{
+          role: 'user',
+          content: `以下の診察メモのテキストから各項目を抽出し、JSONオブジェクトのみを返してください（コードブロック・説明文は不要）。
+
+抽出する項目（すべて文字列、不明なら空文字）:
+- title: 見出し・タイトル
+- date: 診察日（YYYY-MM-DD形式、日本語の日付表記も変換すること。不明ならnull）
+- mental: 精神状態・気分に関する記述
+- concerns: 新たな困りごと・症状の記述
+- bg: 背景・状況・環境の記述
+- assessment: 医師の見立て・診断の記述
+- proposals: 医師の解決策・提案の記述
+- tasks: 今後の課題・気づきの記述
+- reflection: 振り返り・総括の記述
+
+テキスト:
+${text}`
+        }]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${resp.status}`);
+    }
+
+    const data   = await resp.json();
+    const parsed = JSON.parse(data.content[0].text);
+
+    // Fill form
+    if (parsed.title)      setVal('f-title',      parsed.title);
+    if (parsed.date)       setVal('f-date',        parsed.date);
+    if (parsed.mental)     setVal('f-mental',      parsed.mental);
+    if (parsed.concerns)   setVal('f-concerns',    parsed.concerns);
+    if (parsed.bg)         setVal('f-bg',          parsed.bg);
+    if (parsed.assessment) setVal('f-assessment',  parsed.assessment);
+    if (parsed.proposals)  setVal('f-proposals',   parsed.proposals);
+    if (parsed.tasks)      setVal('f-tasks',       parsed.tasks);
+    if (parsed.reflection) setVal('f-reflection',  parsed.reflection);
+    isDirty = true;
+    autoResizeAll();
+    setAIStatus('success', '✓ フォームに反映しました。内容を確認して保存してください。');
+  } catch (e) {
+    setAIStatus('error', `エラー: ${e.message}`);
+  } finally {
+    document.getElementById('ai-parse-btn').disabled = false;
+  }
+}
+
+function setAIStatus(type, html) {
+  const el = document.getElementById('ai-status');
+  el.className = `ai-status ${type}`;
+  el.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════ */
+/*  SETTINGS HELPERS                           */
+/* ═══════════════════════════════════════════ */
+function saveApiKey() {
+  const v = document.getElementById('api-key-input').value.trim();
+  if (!v) { alert('APIキーを入力してください'); return; }
+  localStorage.setItem(APIKEY, v);
+  document.getElementById('api-key-input').value = '';
+  document.getElementById('api-key-input').placeholder = '保存済み（sk-ant-…）';
+  alert('APIキーを保存しました');
+}
+function loadApiKeyUI() {
+  const k = localStorage.getItem(APIKEY);
+  if (k) document.getElementById('api-key-input').placeholder = '保存済み（変更するには新しいキーを入力）';
+}
+function confirmDeleteAll() { openModal('modal-delete-all'); }
+function deleteAllMemos() {
+  storeMemos([]);
+  closeModal('modal-delete-all');
+  renderList();
+  renderCalendar();
+}
+
+/* ═══════════════════════════════════════════ */
+/*  UTILITIES                                  */
+/* ═══════════════════════════════════════════ */
+function fmtDate(s) {
+  if (!s) return '';
+  const d = new Date(s + 'T00:00:00');
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+}
+function toDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function getVal(id) { return document.getElementById(id).value.trim(); }
+function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v || ''; }
+
+function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+function autoResizeAll() { document.querySelectorAll('#overlay-edit textarea').forEach(autoResize); }
+document.querySelectorAll('textarea').forEach(ta => ta.addEventListener('input', () => autoResize(ta)));
+
+/* ═══════════════════════════════════════════ */
+/*  SEED SAMPLE DATA                           */
+/* ═══════════════════════════════════════════ */
+(function seed() {
+  // Migrate old key if needed
+  const old = localStorage.getItem('shinsa-memos-v1');
+  if (old && !localStorage.getItem(MEMO_KEY)) {
+    try {
+      const memos = JSON.parse(old).map(m => ({
+        ...m,
+        mental: m.mental || m.mentalState || '',
+        concerns: m.concerns || m.newConcerns || '',
+        bg: m.bg || m.background || '',
+        assessment: m.assessment || '',
+        proposals: m.proposals || '',
+        tasks: m.tasks || m.futureTasks || '',
+        reflection: m.reflection || '',
+      }));
+      storeMemos(memos);
+      return;
+    } catch {}
+  }
+  if (loadMemos().length) return;
+
+  // Seed hospital
+  const hospId = uid();
+  storeHosps([{ id: hospId, name: '〇〇メンタルクリニック', dept: '心療内科', color: '#6366F1' }]);
+
+  storeMemos([{
+    id: uid(),
+    date: '2026-05-14',
+    hospitalId: hospId,
+    title: '診察記録まとめ',
+    mental:     '抑うつ的な気分の落ち込み自体は改善傾向にある。',
+    concerns:   '文章を読んでいるとき、大事なところを見落としたり、内容が頭に入ってこなかったりする。情報の処理能力が落ちている感覚。',
+    bg:         '妻からの強いプレッシャー。何をやってもダメ出しされる感覚があり、常に「テストされている」ような緊張感の中にいる。相当なストレスを自覚している。',
+    assessment: '文字が頭に入らないのは、発達特性というよりも、ストレスやプレッシャーによる「抑うつ反応」の側面が強い。\n「沸騰したやかんに触れている（ストレス源に触れ続けている）」状態では、症状を良くするのは難しい。',
+    proposals:  '物理的・心理的距離: まずはやかんから手を離す（距離を置く）ことが大前提。\n\n第三者の介入: 二人だけで解決しようとせず「カップルカウンセリング」や、場合によっては「弁護士」などの第三者を入れて客観的な視点を入れること。\n\n役割分担の再定義: 特性（できること・できないこと）を踏まえた上で「トントン（対等）になるライン」を探る必要がある。',
+    tasks:      '「自分が悪い、至らない」と思い詰めていたが、医師からは「100対0（一方が完全に悪い）ということはない」と指摘された。\n\n自分一人で抱え込まず、人生相談の領域も含めて「環境の整理」を考えていく必要がある。\n\n「情報の入力が難しくなっている」のは能力不足ではなく、過度なストレスによるサインだと受け止める。',
+    reflection: '文字が頭に入ってこないという症状は、脳が「これ以上ストレスを処理できない」と発しているSOSかもしれません。\n\n「今はやかんに触れてしまっているから、少し手を離そう」という言葉を思い出すだけでも、少し冷静になれるかもしれません。',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }]);
+})();
+
+/* ── Init ── */
+renderList();
+renderCalendar();
+</script>
+</body>
+</html>
